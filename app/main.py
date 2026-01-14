@@ -62,6 +62,10 @@ def process_download(task_id: str, url: str, fmt: str):
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
+            
+            if not info:
+                raise Exception("Download falhou. O YouTube pode ter bloqueado o IP deste servidor (Bot Detection).")
+
             if 'entries' in info:
                 info = info['entries'][0]
 
