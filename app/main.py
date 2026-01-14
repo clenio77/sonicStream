@@ -1,41 +1,88 @@
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from celery.result import AsyncResult
 from pydantic import BaseModel
 import os
-import secrets
-from app.worker import download_audio_task
+import uuid
+import threading
+import yt_dlp
+import time
+import shutil
 
-app = FastAPI(title="Video to MP3 Extractor")
-security = HTTPBasic()
+app = FastAPI(title="SonicStream Lite")
 
-# Configuração de Auth (Ler de variáveis de ambiente)
-AUTH_USER = os.environ.get("AUTH_USERNAME", "admin")
-AUTH_PASS = os.environ.get("AUTH_PASSWORD", "admin")
-
-def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
-    is_correct_username = secrets.compare_digest(credentials.username, AUTH_USER)
-    is_correct_password = secrets.compare_digest(credentials.password, AUTH_PASS)
-    if not (is_correct_username and is_correct_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
-
-# Configuração de templates e estáticos
+# Configuração
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
-DOWNLOAD_DIR = "/app/downloads"
 
-# Modelo de Input
+# Diretório temporário (No Render, usamos /tmp ou diretório local efêmero)
+DOWNLOAD_DIR = "downloads"
+if not os.path.exists(DOWNLOAD_DIR):
+    os.makedirs(DOWNLOAD_DIR)
+
+# Estado em Memória (In-Memory Database)
+# Estrutura: { "task_id": { "status": "PENDING|PROCESSING|SUCCESS|FAILURE", "result": "filename", "msg": "" } }
+tasks_db = {}
+
 class VideoRequest(BaseModel):
     url: str
-    format: str = "mp3"  # mp3 ou mp4
+    format: str = "mp3"
+
+def process_download(task_id: str, url: str, fmt: str):
+    """Função background que roda em Thread"""
+    print(f"🚀 Iniciando task {task_id} para {url} em {fmt}")
+    tasks_db[task_id]["status"] = "PROCESSING"
+    
+    try:
+        ydl_opts = {
+            'outtmpl': f'{DOWNLOAD_DIR}/{task_id}_%(title)s.%(ext)s',
+            'quiet': True,
+            'no_warnings': True,
+        }
+
+        if fmt == 'mp3':
+            ydl_opts.update({
+                'format': 'bestaudio/best',
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }],
+            })
+        else:
+            # MP4
+            ydl_opts.update({
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                'merge_output_format': 'mp4',
+            })
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if 'entries' in info:
+                info = info['entries'][0]
+
+            # Encontrar o arquivo gerado
+            target_ext = f".{fmt}"
+            filename = None
+            
+            for f in os.listdir(DOWNLOAD_DIR):
+                if f.startswith(task_id) and f.endswith(target_ext):
+                    filename = f
+                    break
+            
+            if filename:
+                tasks_db[task_id]["status"] = "SUCCESS"
+                tasks_db[task_id]["result"] = filename
+            else:
+                tasks_db[task_id]["status"] = "FAILURE"
+                tasks_db[task_id]["msg"] = "Arquivo não encontrado após download."
+
+    except Exception as e:
+        print(f"❌ Erro na task {task_id}: {e}")
+        tasks_db[task_id]["status"] = "FAILURE"
+        tasks_db[task_id]["result"] = str(e)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -43,32 +90,37 @@ async def read_root(request: Request):
 
 @app.post("/api/extract")
 async def extract_audio(video: VideoRequest):
-    """Inicia o job no Celery"""
-    print(f"📥 Recebido pedido: {video.url} | Formato: {video.format}")
-    task = download_audio_task.delay(video.url, video.format)
-    return {"task_id": task.id}
+    # Gerar ID único
+    task_id = str(uuid.uuid4())
+    
+    # Inicializar status
+    tasks_db[task_id] = {
+        "status": "PENDING", 
+        "result": None,
+        "created_at": time.time()
+    }
+    
+    # Iniciar Thread (não bloqueia o servidor)
+    thread = threading.Thread(target=process_download, args=(task_id, video.url, video.format))
+    thread.daemon = True # Mata a thread se o app cair
+    thread.start()
+    
+    return {"task_id": task_id}
 
 @app.get("/api/status/{task_id}")
 async def get_status(task_id: str):
-    """Checa o status da tarefa no Redis"""
-    task_result = AsyncResult(task_id)
+    task = tasks_db.get(task_id)
+    if not task:
+        return JSONResponse(status_code=404, content={"status": "FAILURE", "result": "Task not found"})
     
-    response = {
+    return {
         "task_id": task_id,
-        "status": task_result.status,
-        "result": None
+        "status": task["status"],
+        "result": task["result"]
     }
-
-    if task_result.status == 'SUCCESS':
-        response["result"] = task_result.result # Nome do arquivo
-    elif task_result.status == 'FAILURE':
-        response["result"] = str(task_result.result)
-        
-    return JSONResponse(response)
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
-    """Serve o arquivo MP3/MP4"""
     file_path = os.path.join(DOWNLOAD_DIR, filename)
     if os.path.exists(file_path):
         media_type = 'audio/mpeg' if filename.endswith('.mp3') else 'video/mp4'
@@ -77,31 +129,30 @@ async def download_file(filename: str):
 
 @app.get("/api/downloads")
 async def list_downloads():
-    """Lista os arquivos baixados e remove antigos (> 24h)"""
+    """Lista downloads e limpa memória antiga"""
     files = []
-    
-    # 24 horas em segundos
-    MAX_AGE = 24 * 60 * 60 
-    now = os.path.getmtime('.') # Time de referência (hacky but works) ou time.time()
-    import time
+    MAX_AGE = 24 * 60 * 60 # 24h arquivo
     now_ts = time.time()
 
+    # 1. Limpar Tasks antigas da memória (> 1 hora)
+    keys_to_delete = []
+    for tid, tdata in tasks_db.items():
+        if now_ts - tdata['created_at'] > 3600: # 1h
+            keys_to_delete.append(tid)
+    for k in keys_to_delete:
+        del tasks_db[k]
+        
+    # 2. Listar Arquivos
     if os.path.exists(DOWNLOAD_DIR):
         for f in os.listdir(DOWNLOAD_DIR):
-            file_path = os.path.join(DOWNLOAD_DIR, f)
+            if not (f.endswith(".mp3") or f.endswith(".mp4")): continue
             
-            # Verificação de segurança basica
-            if not (f.endswith(".mp3") or f.endswith(".mp4")):
-                continue
-
+            path = os.path.join(DOWNLOAD_DIR, f)
             try:
-                stats = os.stat(file_path)
-                file_age = now_ts - stats.st_mtime
-                
-                # Auto-Cleanup: Deletar se for maior que 24h
-                if file_age > MAX_AGE:
-                    os.remove(file_path)
-                    print(f"🗑️ Cleaned up old file: {f}")
+                stats = os.stat(path)
+                # Auto-Cleanup Arquivos (>24h)
+                if now_ts - stats.st_mtime > MAX_AGE:
+                    os.remove(path)
                     continue
 
                 files.append({
@@ -110,9 +161,7 @@ async def list_downloads():
                     "created_at": stats.st_mtime,
                     "type": "mp3" if f.endswith(".mp3") else "mp4"
                 })
-            except Exception as e:
-                print(f"Error processing file {f}: {e}")
+            except: pass
 
-    # Ordenar por mais novo
     files.sort(key=lambda x: x['created_at'], reverse=True)
     return files

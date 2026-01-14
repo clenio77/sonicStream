@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-# Instala o FFmpeg (Obrigatório para o yt-dlp converter para mp3)
+# Instalar FFmpeg
 RUN apt-get update && \
     apt-get install -y ffmpeg && \
     apt-get clean
@@ -12,8 +12,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY ./app ./app
 
-# Cria diretório de downloads
-RUN mkdir -p /app/downloads
+# Diretório para downloads
+RUN mkdir -p /app/downloads && chmod 777 /app/downloads
 
-# Variavel de ambiente para o Python não bufferizar logs
-ENV PYTHONUNBUFFERED=1
+# Expor porta 8000 (Render espera 10000 por padrão, mas configuramos via env ou start command)
+EXPOSE 8000
+
+# Comando único para rodar o app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
