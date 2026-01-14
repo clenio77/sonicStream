@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SonicStream | Video to MP3</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --accent: #ec4899;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(148, 163, 184, 0.1);
+            --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        /* Glassmorphism Header */
+        .header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-weight: 700;
+            font-size: 2.5rem;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--text-muted) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* Main Card */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            margin-bottom: 2rem;
+            animation: fadeInUp 0.8s ease-out 0.2s backwards;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 1.25rem;
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            flex-grow: 1;
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1rem 1rem 3rem;
+            color: var(--text-main);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            outline: none;
+            height: 54px;
+            /* Fixed height for alignment */
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn-paste {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            border-radius: 12px;
+            width: 54px;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1.2rem;
+        }
+
+        .btn-paste:active {
+            transform: scale(0.95);
+        }
+
+        .btn-paste:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Format Switcher */
+        .format-switcher {
+            display: flex;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 4px;
+            border-radius: 14px;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+
+        .format-option {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 10px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .format-option.active {
+            color: white;
+            background: var(--primary);
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.25);
+        }
+
+        .btn-extract {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            border: none;
+            border-radius: 12px;
+            padding: 1rem;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-extract:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .btn-extract:active {
+            transform: translateY(1px);
+        }
+
+        .btn-extract:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Status & Processing */
+        .status-container {
+            margin-top: 1.5rem;
+            text-align: center;
+            display: none;
+            padding: 1.5rem;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: var(--glass-border);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(99, 102, 241, 0.1);
+            border-left-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem auto;
+        }
+
+        .status-text {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .status-success {
+            color: #4ade80;
+            font-weight: 600;
+        }
+
+        .status-error {
+            color: #f87171;
+        }
+
+        /* Downloads List */
+        .downloads-section {
+            animation: fadeInUp 0.8s ease-out 0.4s backwards;
+        }
+
+        .downloads-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .download-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .download-item {
+            background: var(--card-bg);
+            border: var(--glass-border);
+            border-radius: 16px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: background 0.2s ease;
+        }
+
+        .download-item:hover {
+            background: rgba(45, 55, 75, 0.9);
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            overflow: hidden;
+        }
+
+        .file-icon {
+            width: 44px;
+            height: 44px;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .file-icon.video {
+            background: rgba(236, 72, 153, 0.1);
+            color: var(--accent);
+        }
+
+        .file-details {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-width: 0;
+            /* flexbox fix for ellipsis */
+        }
+
+        .file-name {
+            font-weight: 500;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .btn-download {
+            background: transparent;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            padding: 0.6rem;
+            border-radius: 10px;
+            text-decoration: none;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            margin-left: 10px;
+        }
+
+        .btn-download:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .card {
+                padding: 1.5rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .file-name {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>SonicStream</h1>
+            <p>Baixe músicas e vídeos com um toque.</p>
+        </div>
+
+        <!-- Extraction Card -->
+        <div class="card">
+
+            <!-- Link Input with Magic Paste -->
+            <div class="input-group">
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-link input-icon"></i>
+                    <input type="text" id="videoUrl" placeholder="Cole o link aqui..." autocomplete="off">
+                </div>
+                <button class="btn-paste" id="pasteBtn" onclick="pasteFromClipboard()" title="Colar Link">
+                    <i class="fa-regular fa-paste"></i>
+                </button>
+            </div>
+
+            <!-- Format Switcher -->
+            <div class="format-switcher">
+                <div class="format-option active" id="opt-mp3" onclick="setFormat('mp3')">
+                    <i class="fa-solid fa-music"></i> MP3 (Áudio)
+                </div>
+                <div class="format-option" id="opt-mp4" onclick="setFormat('mp4')">
+                    <i class="fa-solid fa-video"></i> MP4 (Vídeo)
+                </div>
+            </div>
+
+            <button class="btn-extract" id="extractBtn" onclick="startExtraction()">
+                <i class="fa-solid fa-cloud-arrow-down"></i> Baixar Agora
+            </button>
+
+            <div id="statusContainer" class="status-container">
+                <div id="spinner" class="spinner"></div>
+                <div id="statusText" class="status-text">Processando...</div>
+                <a id="successAction" href="#" class="btn-extract"
+                    style="display:none; margin-top:1rem; text-decoration:none; background: #10b981;">
+                    <i class="fa-solid fa-download"></i> Salvar Arquivo
+                </a>
+            </div>
+        </div>
+
+        <!-- Downloads List -->
+        <div class="downloads-section">
+            <div class="downloads-header">
+                <span>Downloads Recentes (24h)</span>
+                <button onclick="loadDownloads()"
+                    style="background:none; border:none; color:var(--primary); cursor:pointer;">
+                    <i class="fa-solid fa-rotate"></i>
+                </button>
+            </div>
+            <div id="downloadList" class="download-list">
+                <!-- Items injected by JS -->
+                <div class="download-item" style="justify-content: center; color: var(--text-muted);">
+                    <i class="fa-solid fa-spinner fa-spin"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFormat = 'mp3';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadDownloads();
+            // Check permission query for clipboard (optional but good practice)
+        });
+
+        function setFormat(fmt) {
+            currentFormat = fmt;
+            document.querySelectorAll('.format-option').forEach(el => el.classList.remove('active'));
+            document.getElementById(`opt-${fmt}`).classList.add('active');
+
+            const btnIcon = document.querySelector('#extractBtn i');
+            // Visual feedback on main button
+            if (fmt === 'mp4') {
+                btnIcon.className = 'fa-solid fa-film';
+            } else {
+                btnIcon.className = 'fa-solid fa-music';
+            }
+        }
+
+        async function pasteFromClipboard() {
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    const input = document.getElementById('videoUrl');
+                    input.value = text;
+                    input.focus();
+                    // Optional: Visual feedback
+                    const btn = document.getElementById('pasteBtn');
+                    const originalIcon = btn.innerHTML;
+                    btn.innerHTML = '<i class="fa-solid fa-check" style="color:#4ade80"></i>';
+                    setTimeout(() => btn.innerHTML = originalIcon, 1000);
+                }
+            } catch (err) {
+                console.error('Failed to read clipboard', err);
+                alert('Não foi possível colar automaticamente. Permissão negada.');
+            }
+        }
+
+        async function loadDownloads() {
+            const listContainer = document.getElementById('downloadList');
+            try {
+                const res = await fetch('/api/downloads');
+                const files = await res.json();
+
+                listContainer.innerHTML = '';
+
+                if (files.length === 0) {
+                    listContainer.innerHTML = `
+                    <div style="text-align:center; padding: 2rem; color: var(--text-muted); opacity: 0.6;">
+                        <i class="fa-regular fa-clock" style="font-size: 2rem; margin-bottom: 0.5rem; display:block;"></i>
+                        Nenhum download recente.
+                    </div>`;
+                    return;
+                }
+
+                files.forEach(file => {
+                    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+                    const displayName = file.filename.replace(/^[a-f0-9-]{36}_/, '');
+                    const isVideo = file.type === 'mp4';
+
+                    const item = document.createElement('div');
+                    item.className = 'download-item';
+
+                    const iconClass = isVideo ? 'fa-solid fa-film' : 'fa-solid fa-music';
+                    const iconStyleClass = isVideo ? 'file-icon video' : 'file-icon';
+
+                    item.innerHTML = `
+                    <div class="file-info">
+                        <div class="${iconStyleClass}">
+                            <i class="${iconClass}"></i>
+                        </div>
+                        <div class="file-details">
+                            <span class="file-name">${displayName}</span>
+                            <span class="file-meta">${file.type.toUpperCase()} • ${sizeMB} MB</span>
+                        </div>
+                    </div>
+                    <a href="/download/${file.filename}" class="btn-download" download>
+                        <i class="fa-solid fa-download"></i>
+                    </a>
+                `;
+                    listContainer.appendChild(item);
+                });
+            } catch (e) {
+                console.error("Erro ao carregar downloads", e);
+            }
+        }
+
+        async function startExtraction() {
+            const urlInput = document.getElementById('videoUrl');
+            const url = urlInput.value.trim();
+            const btn = document.getElementById('extractBtn');
+            const statusBox = document.getElementById('statusContainer');
+            const statusText = document.getElementById('statusText');
+            const spinner = document.getElementById('spinner');
+            const successBtn = document.getElementById('successAction');
+
+            if (!url) return alert('Por favor, cole um link primeiro.');
+
+            // UI Set State
+            btn.disabled = true;
+            statusBox.style.display = 'block';
+            spinner.style.display = 'block';
+            successBtn.style.display = 'none';
+            statusText.innerHTML = `Baixando ${currentFormat.toUpperCase()}... <br><small style="opacity:0.7">Aguarde um momento.</small>`;
+            statusText.className = 'status-text';
+
+            try {
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url, format: currentFormat })
+                });
+
+                if (!response.ok) throw new Error('Falha na requisição');
+
+                const data = await response.json();
+                pollStatus(data.task_id);
+
+            } catch (e) {
+                statusText.innerText = "Erro ao conectar com o servidor.";
+                statusText.className = "status-text status-error";
+                spinner.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        async function pollStatus(taskId) {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/status/${taskId}`);
+                    const data = await res.json();
+
+                    const statusText = document.getElementById('statusText');
+                    const spinner = document.getElementById('spinner');
+                    const successBtn = document.getElementById('successAction');
+                    const btn = document.getElementById('extractBtn');
+
+                    if (data.status === 'SUCCESS') {
+                        clearInterval(interval);
+                        spinner.style.display = 'none';
+                        statusText.innerHTML = '<i class="fa-solid fa-circle-check"></i> Concluído!';
+                        statusText.className = "status-text status-success";
+
+                        successBtn.href = `/download/${data.result}`;
+                        successBtn.style.display = 'inline-block';
+
+                        document.getElementById('videoUrl').value = '';
+                        btn.disabled = false;
+                        loadDownloads();
+                    }
+                    else if (data.status === 'FAILURE') {
+                        clearInterval(interval);
+                        spinner.style.display = 'none';
+                        statusText.innerText = "Falha: " + (data.result || "Erro desconhecido");
+                        statusText.className = "status-text status-error";
+                        btn.disabled = false;
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                }
+            }, 2000);
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js');
+            });
+        }
+    </script>
+
+</body>
+
+</html>
+<!-- Google Fonts: Inter -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<!-- PWA -->
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#0f172a">
+<link rel="icon" type="image/svg+xml" href="/static/icon.svg">
+
+<style>
+    :root {
+        --bg-color: #0f172a;
+        --card-bg: rgba(30, 41, 59, 0.7);
+        --primary: #6366f1;
+        --primary-hover: #4f46e5;
+        --accent: #ec4899;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --border: rgba(148, 163, 184, 0.1);
+        --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-color);
+        background-image:
+            radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+        background-attachment: fixed;
+        color: var(--text-main);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 2rem 1rem;
+    }
+
+    .container {
+        width: 100%;
+        max-width: 800px;
+    }
+
+    /* Glassmorphism Header */
+    .header {
+        text-align: center;
+        margin-bottom: 3rem;
+        animation: fadeInDown 0.8s ease-out;
+    }
+
+    .header h1 {
+        font-weight: 700;
+        font-size: 2.5rem;
+        letter-spacing: -0.02em;
+        background: linear-gradient(135deg, var(--text-main) 0%, var(--text-muted) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0.5rem;
+    }
+
+    .header p {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    /* Main Card */
+    .card {
+        background: var(--card-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: var(--glass-border);
+        border-radius: 24px;
+        padding: 2.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        margin-bottom: 2rem;
+        animation: fadeInUp 0.8s ease-out 0.2s backwards;
+    }
+
+    .input-group {
+        position: relative;
+        margin-bottom: 1.5rem;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 1.25rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+        pointer-events: none;
+    }
+
+    input[type="text"] {
+        width: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1rem 1rem 1rem 3rem;
+        color: var(--text-main);
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        outline: none;
+    }
+
+    input[type="text"]:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+    }
+
+    .btn-extract {
+        width: 100%;
+        background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 1rem;
+        color: white;
+        font-weight: 600;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-extract:hover {
+        transform: translateY(-1px);
+        opacity: 0.95;
+    }
+
+    .btn-extract:active {
+        transform: translateY(1px);
+    }
+
+    .btn-extract:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    /* Status & Processing */
+    .status-container {
+        margin-top: 1.5rem;
+        text-align: center;
+        display: none;
+        padding: 1.5rem;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.05);
+        border: var(--glass-border);
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid rgba(99, 102, 241, 0.1);
+        border-left-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem auto;
+    }
+
+    .status-text {
+        color: var(--text-muted);
+        font-size: 0.95rem;
+    }
+
+    .status-success {
+        color: #4ade80;
+        font-weight: 600;
+    }
+
+    .status-error {
+        color: #f87171;
+    }
+
+    /* Downloads List */
+    .downloads-section {
+        animation: fadeInUp 0.8s ease-out 0.4s backwards;
+    }
+
+    .downloads-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .download-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .download-item {
+        background: var(--card-bg);
+        border: var(--glass-border);
+        border-radius: 16px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: background 0.2s ease;
+    }
+
+    .download-item:hover {
+        background: rgba(45, 55, 75, 0.9);
+    }
+
+    .file-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        overflow: hidden;
+    }
+
+    .file-icon {
+        width: 40px;
+        height: 40px;
+        background: rgba(99, 102, 241, 0.1);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+    }
+
+    .file-details {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .file-name {
+        font-weight: 500;
+        color: var(--text-main);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 300px;
+    }
+
+    .file-meta {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .btn-download {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+
+    .btn-download:hover {
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary);
+        border-color: var(--primary);
+    }
+
+    @keyframes spin {
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes fadeInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .card {
+            padding: 1.5rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>SonicStream</h1>
+            <p>Transforme vídeos em áudio com qualidade premium.</p>
+        </div>
+
+        <!-- Extraction Card -->
+        <div class="card">
+            <div class="input-group">
+                <i class="fa-solid fa-link input-icon"></i>
+                <input type="text" id="videoUrl" placeholder="Cole o link do YouTube, Instagram ou X aqui..."
+                    autocomplete="off">
+            </div>
+            <button class="btn-extract" id="extractBtn" onclick="startExtraction()">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Extrair Áudio
+            </button>
+
+            <div id="statusContainer" class="status-container">
+                <div id="spinner" class="spinner"></div>
+                <div id="statusText" class="status-text">Iniciando processo mágico...</div>
+                <a id="successAction" href="#" class="btn-extract"
+                    style="display:none; margin-top:1rem; text-decoration:none; background: #10b981;">
+                    <i class="fa-solid fa-download"></i> Baixar Agora
+                </a>
+            </div>
+        </div>
+
+        <!-- Downloads List -->
+        <div class="downloads-section">
+            <div class="downloads-header">
+                <span>Downloads Recentes</span>
+                <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div id="downloadList" class="download-list">
+                <!-- Items injected by JS -->
+                <div class="download-item" style="justify-content: center; color: var(--text-muted);">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Carregando histórico...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', loadDownloads);
+
+        async function loadDownloads() {
+            const listContainer = document.getElementById('downloadList');
+            try {
+                const res = await fetch('/api/downloads');
+                const files = await res.json();
+
+                listContainer.innerHTML = '';
+
+                if (files.length === 0) {
+                    listContainer.innerHTML = `
+                    <div style="text-align:center; padding: 2rem; color: var(--text-muted);">
+                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; margin-bottom: 0.5rem; display:block;"></i>
+                        Nenhum download ainda.
+                    </div>`;
+                    return;
+                }
+
+                files.forEach(file => {
+                    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+                    // Limpar nome para display
+                    const displayName = file.filename.replace(/^[a-f0-9-]{36}_/, '');
+
+                    const item = document.createElement('div');
+                    item.className = 'download-item';
+                    item.innerHTML = `
+                    <div class="file-info">
+                        <div class="file-icon">
+                            <i class="fa-solid fa-music"></i>
+                        </div>
+                        <div class="file-details">
+                            <span class="file-name" title="${displayName}">${displayName}</span>
+                            <span class="file-meta">${sizeMB} MB • MP3</span>
+                        </div>
+                    </div>
+                    <a href="/download/${file.filename}" class="btn-download" download>
+                        <i class="fa-solid fa-download"></i> Baixar
+                    </a>
+                `;
+                    listContainer.appendChild(item);
+                });
+            } catch (e) {
+                console.error("Erro ao carregar downloads", e);
+            }
+        }
+
+        async function startExtraction() {
+            const urlInput = document.getElementById('videoUrl');
+            const url = urlInput.value.trim();
+            const btn = document.getElementById('extractBtn');
+            const statusBox = document.getElementById('statusContainer');
+            const statusText = document.getElementById('statusText');
+            const spinner = document.getElementById('spinner');
+            const successBtn = document.getElementById('successAction');
+
+            if (!url) return;
+
+            // UI Set State: Loading
+            btn.disabled = true;
+            statusBox.style.display = 'block';
+            spinner.style.display = 'block';
+            successBtn.style.display = 'none';
+            statusText.innerHTML = 'Processando... <br><small style="opacity:0.7">Isso pode levar alguns segundos.</small>';
+            statusText.className = 'status-text';
+
+            try {
+                const response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (!response.ok) throw new Error('Falha na requisição');
+
+                const data = await response.json();
+                pollStatus(data.task_id);
+
+            } catch (e) {
+                statusText.innerText = "Erro ao conectar com o servidor.";
+                statusText.className = "status-text status-error";
+                spinner.style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        async function pollStatus(taskId) {
+            const interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/status/${taskId}`);
+                    const data = await res.json();
+
+                    const statusText = document.getElementById('statusText');
+                    const spinner = document.getElementById('spinner');
+                    const successBtn = document.getElementById('successAction');
+                    const btn = document.getElementById('extractBtn');
+
+                    if (data.status === 'SUCCESS') {
+                        clearInterval(interval);
+                        spinner.style.display = 'none';
+                        statusText.innerHTML = '<i class="fa-solid fa-circle-check"></i> Pronto!';
+                        statusText.className = "status-text status-success";
+
+                        // Show download button in status box
+                        successBtn.href = `/download/${data.result}`;
+                        successBtn.style.display = 'inline-block';
+
+                        // Reset input
+                        document.getElementById('videoUrl').value = '';
+                        btn.disabled = false;
+
+                        // Refresh List
+                        loadDownloads();
+                    }
+                    else if (data.status === 'FAILURE') {
+                        clearInterval(interval);
+                        spinner.style.display = 'none';
+                        statusText.innerText = "Falha: " + (data.result || "Erro desconhecido");
+                        statusText.className = "status-text status-error";
+                        btn.disabled = false;
+                    }
+                } catch (e) {
+                    clearInterval(interval);
+                    btn.disabled = false;
+                }
+            }, 2000);
+        }
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+
+</body>
+
+</html>

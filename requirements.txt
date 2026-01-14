@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+celery
+redis
+yt-dlp
+jinja2
+python-multipart
+requests
