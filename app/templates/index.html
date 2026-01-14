@@ -549,7 +549,7 @@
                             <span class="file-meta">${file.type.toUpperCase()} • ${sizeMB} MB</span>
                         </div>
                     </div>
-                    <a href="/download/${file.filename}" class="btn-download" download>
+                    <a href="/download/${encodeURIComponent(file.filename)}" class="btn-download" download>
                         <i class="fa-solid fa-download"></i>
                     </a>
                 `;
@@ -616,7 +616,7 @@
                         statusText.innerHTML = '<i class="fa-solid fa-circle-check"></i> Concluído!';
                         statusText.className = "status-text status-success";
 
-                        successBtn.href = `/download/${data.result}`;
+                        successBtn.href = `/download/${encodeURIComponent(data.result)}`;
                         successBtn.style.display = 'inline-block';
 
                         document.getElementById('videoUrl').value = '';
