@@ -44,6 +44,7 @@ async def read_root(request: Request):
 @app.post("/api/extract")
 async def extract_audio(video: VideoRequest):
     """Inicia o job no Celery"""
+    print(f"📥 Recebido pedido: {video.url} | Formato: {video.format}")
     task = download_audio_task.delay(video.url, video.format)
     return {"task_id": task.id}
 

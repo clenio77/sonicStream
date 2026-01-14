@@ -14,6 +14,7 @@ def download_audio_task(self, url: str, format: str = "mp3"):
     """
     Baixa o vídeo. Se format='mp3', extrai áudio. Se 'mp4', baixa vídeo completo.
     """
+    print(f"🔧 Worker processing: {url} | Format: {format}")
     
     # Configuração Base
     ydl_opts = {
@@ -33,8 +34,10 @@ def download_audio_task(self, url: str, format: str = "mp3"):
         })
     else:
         # MP4 (Video + Audio)
+        # Forçamos o merge para mp4 caso baixe streams separados (comum no YouTube)
         ydl_opts.update({
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            'merge_output_format': 'mp4',  
         })
 
     try:
